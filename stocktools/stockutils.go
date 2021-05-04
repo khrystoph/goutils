@@ -91,7 +91,9 @@ func SimpleMovingAverage(vals []float64) (simpleMovingAverage float64, err error
 func main() {
 	defer os.Exit(0)
 	testPriceArray := []float64{3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0}
-	testRSIArray := []float64{-2.77, 4.79, 8.6, -0.18, 6.02, 1.23, -16.7, 9.64, 8.68, -0.8, 4.88, -1.83, -3.96, -9.09, -7.79, 2.3, -1.94, -7.72, 7.67, -9.48, 4.06, -1.22, 1, 4.91, 7.96, -6.99, 7.09, 4.92, -5.61}
+	testRSIArray := []float64{-2.77, 4.79, 8.6, -0.18, 6.02, 1.23, -16.7, 9.64, 8.68, -0.8, 4.88,
+		-1.83, -3.96, -9.09, -7.79, 2.3, -1.94, -7.72, 7.67, -9.48, 4.06, -1.22, 1, 4.91, 7.96,
+		-6.99, 7.09, 4.92, -5.61}
 	sma, err := SimpleMovingAverage(testPriceArray)
 	if err != nil {
 		fmt.Printf("%v\n", err)
