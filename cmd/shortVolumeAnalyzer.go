@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	DEFAULT_TIME_FORMAT           = "2006-01-02"
-	DEFAULT_TIME_URL_STRING       = "20060102"
-	HOURS_PER_DAY           int64 = 24
+	DEFAULT_TIME_FORMAT     string = "2006-01-02"
+	DEFAULT_TIME_URL_STRING string = "20060102"
+	HOURS_PER_DAY           int64  = 24
 )
 
 var (
@@ -121,28 +121,28 @@ func fetchStockVolumeData(url string, finraShortDataMap *map[string]ShortData) (
 			for index, key := range strings.Split(line, ",") {
 				columnMapping[key] = index
 			}
-			fmt.Printf("column Mapping:\n%v", columnMapping)
+			fmt.Printf("column Mapping:\n%v\n", columnMapping)
 
 			//Bulk of logic to create the struct is here.
 		} else {
-			tradeDate, err := time.Parse("20060102", strings.Split(line, ",")[columnMapping["Date"]])
+			tradeDate, err := time.Parse(DEFAULT_TIME_URL_STRING, strings.Split(line, ",")[columnMapping["Date"]])
 			if err != nil {
-				fmt.Printf("unable to parse trade date: %v", err)
+				fmt.Printf("unable to parse trade date: %v\n", err)
 				return err
 			}
 			shortVolume, err := strconv.ParseFloat(strings.Split(line, ",")[columnMapping["ShortVolume"]], 64)
 			if err != nil {
-				fmt.Printf("unable to parse Short Volume: %v", err)
+				fmt.Printf("unable to parse Short Volume: %v\n", err)
 				return err
 			}
 			shortExemptVolume, err := strconv.ParseFloat(strings.Split(line, ",")[columnMapping["ShortExemptVolume"]], 64)
 			if err != nil {
-				fmt.Printf("unable to parse Short Exempt Volume: %v", err)
+				fmt.Printf("unable to parse Short Exempt Volume: %v\n", err)
 				return err
 			}
 			totalTradeVolume, err := strconv.ParseFloat(strings.Split(line, ",")[columnMapping["TotalVolume"]], 64)
 			if err != nil {
-				fmt.Printf("unable to parse Total Trade Volume: %v", err)
+				fmt.Printf("unable to parse Total Trade Volume: %v\n", err)
 				return err
 			}
 			marketArray := strings.Split((strings.Split(line, ",")[columnMapping["Market"]]), ";")
@@ -159,6 +159,7 @@ func fetchStockVolumeData(url string, finraShortDataMap *map[string]ShortData) (
 			symbolShortData.ShortExemptVolPercent = (symbolShortData.ShortExemptVol) / symbolShortData.TotalVolume * 100
 			symbolShortData.BuyVol = symbolShortData.TotalVolume - symbolShortData.ShortVol
 			symbolShortData.BuyVolPercent = (symbolShortData.BuyVol) / symbolShortData.TotalVolume * 100
+
 		}
 	}
 	return err
@@ -178,10 +179,15 @@ func worker(tickers *map[string]ShortData, start, end time.Time, deltaDays int64
 	* end: a Time var indicating the last trading day to retrieve.
 	*
 	 */
+	fmt.Printf("start: %v\n", start)
+	url := inputURLPrefix + start.Format("20060102") + inputURLPost
+	fmt.Printf("%v\n", url)
+	fetchStockVolumeData(url, tickers)
+	os.Exit(0)
 
 	for i := 0; i < int(deltaDays); i++ {
 		retrieveDate := start.Add(time.Duration(int64(i * int(time.Hour) * 24)))
-		fmt.Printf("date of retrieval is: %v\n", retrieveDate.Format("20060102"))
+		fmt.Printf("date of retrieval is: %v\n", retrieveDate.Format(DEFAULT_TIME_URL_STRING))
 	}
 
 	return nil
@@ -190,12 +196,12 @@ func worker(tickers *map[string]ShortData, start, end time.Time, deltaDays int64
 //Retrieve short vol data from FINRA, organize the data, and then present data based on highest short interest.
 func main() {
 
+	flag.Parse()
 	var (
 		startDate, endDate time.Time
 		numDays            int64
+		err                error
 	)
-
-	flag.Parse()
 
 	//Need to check for existence of both walkbaack days and start/end dates. If both exist, either error out or choose one to have preceedence over the other.
 
@@ -205,24 +211,31 @@ func main() {
 		endDate = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.UTC)
 		numDays = defaultDays
 	} else {
-		startDate, err := time.Parse(DEFAULT_TIME_FORMAT, startDateString)
+		fmt.Printf("startDateString: %s\n", startDateString)
+		startDate, err = time.Parse("2006-01-02", startDateString)
 		if err != nil {
 			fmt.Printf("Error converting start Date into a date format. Required format: YYYY-mm-dd, where Y is year, m is month, and d is day. Error msg:\n %v", err)
 			os.Exit(1)
 		}
-		endDate, err := time.Parse(DEFAULT_TIME_FORMAT, endDateString)
+		fmt.Printf("startDate: %v\n", startDate)
+
+		fmt.Printf("endDateString: %s\n", endDateString)
+		endDate, err = time.Parse(DEFAULT_TIME_FORMAT, endDateString)
 		if err != nil {
 			fmt.Printf("Error converting end Date into a date format. Required format: YYYY-mm-dd, where Y is year, m is month, and d is day. Error msg:\n %v", err)
 			os.Exit(1)
 		}
+		fmt.Printf("endDate: %v\n", endDate)
 		numDays = int64(endDate.Sub(startDate).Hours()) / HOURS_PER_DAY
 	}
 
 	//create map of tickers
-	tickerMap := make(map[string]ShortData)
+	tickerMap := make(map[string]ShortData, numDays)
 
 	//kick off the function that will do most of the work.
-	err := worker(&tickerMap, startDate, endDate, numDays)
+
+	fmt.Printf("start date: %v\n", startDate)
+	err = worker(&tickerMap, startDate, endDate, numDays)
 	if err != nil {
 		fmt.Printf("Error running main worker. Error is: %v", err)
 		os.Exit(1)
