@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -95,7 +96,7 @@ func isFlagPassed(name string) bool {
 
 //fetchStockVolumeData grabs the data from Finra and returns a struct of type shortData containing all
 //the data in the finra daily volume txt web pages
-func fetchStockVolumeData(url string, finraShortDataMap *map[string]ShortData) (err error) {
+func fetchStockVolumeData(url string, finraShortDataMap map[string]ShortData) (err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -160,13 +161,21 @@ func fetchStockVolumeData(url string, finraShortDataMap *map[string]ShortData) (
 			symbolShortData.BuyVol = symbolShortData.TotalVolume - symbolShortData.ShortVol
 			symbolShortData.BuyVolPercent = (symbolShortData.BuyVol) / symbolShortData.TotalVolume * 100
 
+			_, ok := finraShortDataMap[symbolShortData.Symbol]
+			if !ok {
+				finraShortDataMap[symbolShortData.Symbol] = ShortData{
+					StockSymbol:     symbolShortData.Symbol,
+					ShortVolumeData: make(map[string]DailyShortData),
+				}
+			}
+			finraShortDataMap[symbolShortData.Symbol].ShortVolumeData[tradeDate.Format(DEFAULT_TIME_URL_STRING)] = symbolShortData
 		}
 	}
 	return err
 }
 
 //worker function to coordinate fetching data and adding it to the map of tickers.
-func worker(tickers *map[string]ShortData, start, end time.Time, deltaDays int64) (err error) {
+func worker(tickers map[string]ShortData, start, end time.Time, deltaDays int64) (err error) {
 	/*
 	* Retrieve a day of data and store it in the map.
 	* Handle page retrieve errors on days that don't trade
@@ -180,16 +189,13 @@ func worker(tickers *map[string]ShortData, start, end time.Time, deltaDays int64
 	*
 	 */
 	fmt.Printf("start: %v\n", start)
-	url := inputURLPrefix + start.Format("20060102") + inputURLPost
-	fmt.Printf("%v\n", url)
-	fetchStockVolumeData(url, tickers)
-	os.Exit(0)
 
 	for i := 0; i < int(deltaDays); i++ {
 		retrieveDate := start.Add(time.Duration(int64(i * int(time.Hour) * 24)))
 		fmt.Printf("date of retrieval is: %v\n", retrieveDate.Format(DEFAULT_TIME_URL_STRING))
+		url := inputURLPrefix + retrieveDate.Format("20060102") + inputURLPost
+		fetchStockVolumeData(url, tickers)
 	}
-
 	return nil
 }
 
@@ -230,17 +236,22 @@ func main() {
 	}
 
 	//create map of tickers
-	tickerMap := make(map[string]ShortData, numDays)
+	tickerMap := make(map[string]ShortData)
 
 	//kick off the function that will do most of the work.
 
 	fmt.Printf("start date: %v\n", startDate)
-	err = worker(&tickerMap, startDate, endDate, numDays)
+	err = worker(tickerMap, startDate, endDate, numDays)
 	if err != nil {
 		fmt.Printf("Error running main worker. Error is: %v", err)
 		os.Exit(1)
 	}
 
+	marshalIndentTickers, err := json.MarshalIndent(tickerMap, "", "    ")
+	if err != nil {
+		fmt.Printf("Error marshalling input. Error:\n %v\n", err)
+	}
+	fmt.Printf("Short Data: \n%s", marshalIndentTickers)
 	fmt.Printf("Completed tasks. Exiting Cleanly.")
 	return
 }
